@@ -8,8 +8,8 @@
 This program needs Python version 3.6.1 or higher.
 
 To install addintional amodules:
-`pip install websockets`
-`pip install aioconsole`
+`pip install websockets
+pip install aioconsole`
 
 
 # Usage
