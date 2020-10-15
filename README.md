@@ -7,7 +7,7 @@
 
 This program needs Python version 3.6.1 or higher.
 
-To install addintional amodules:
+To install addintional amodules: <br>
 `pip install websockets`<br>
 `pip install aioconsole`
 
