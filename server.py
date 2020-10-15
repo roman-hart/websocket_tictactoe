@@ -12,12 +12,11 @@ class User:
         self.ws = webs
         self.name = 'User'
         self.game = None
-        self.players = None, None  # self / opponent
+        self.players = None, None  # first player / second player
         self._[self.id] = self
 
     async def register(self, msg):
         if msg and msg.isalpha():
-            print('registred')
             self.name = msg.capitalize()
             return True
 
@@ -31,40 +30,63 @@ class User:
             if u.name.lower() == msg and not u.game:
                 opponent = u
         if opponent:
+            await opponent.send(f'You were invited to the game with {self.name}')
             self.game = opponent.game = Game()
             self.players = opponent.players = self, opponent
-            await opponent.ws.send(f'You were invited to the game wish {self.name}')
             return True
+            # except Exception as e:
+            #    await self.send(f'ERROR: {e} \nWe have lost connection with this user.')
+             #   User._.pop(opponent.id)
 
     async def answer(self, msg):
-        num = self.game.step % 2
-        if self.players[num] != self:
+        n = self.game.step % 2
+        if self.players[n] != self:
             return 'Now we are waiting for your opponent to move!'
-        waiting_player = self.players[abs(num - 1)]
+        waiting_player = self.players[abs(n - 1)]
         er = self.game.check_move_str(msg)
         if er:
             return er
         message = await self.game.move(int(msg)-1)
         if waiting_player:
-            if waiting_player != self:
-                await waiting_player.ws.send(message + '\nYour move:')
-            else:
-                message += f'\nYour move again:'
+            await waiting_player.send(message + 'Your move:' if self.game.step % 2 != n else message)
         else:
-            message += await self.game.move(self.game.smart_move(self.game.m, *self.game.sets[num]))
-            message += '\nYour next move: '
-        return message
+            message += await self.game.move(self.game.smart_move(self.game.m, *self.game.sets[not n])) + '\nYour move: '
+        return message + 'Your move:' if self.game.step % 2 == n else message
+
+    async def disconnect(self):
+        opponent = self.players[int(not self.players.index(self))]
+        if opponent:
+            await User._disconnect(opponent)
+            await opponent.send(f'{self.name} has escaped the game.')
+        await User._disconnect(self)
+        return 'You have escaped the game.'
+
+    async def send(self, msg):
+        if self.ws:
+            try:
+                await self.ws.send(msg)
+            except:
+                await User._disconnect(self)
+                try:
+                    opponent = self.players[int(not self.players.index(self))]
+                    if opponent:
+                        await User._disconnect(opponent)
+                        await opponent.ws.send(f'We\'ve lost connection with {self.name}...')
+                        User._.pop(self.id)
+                except:
+                    pass  # User._.pop(opponent.id)
+
+    @staticmethod
+    async def _disconnect(u):
+        u.game = None
+        u.players = None, None
 
     @staticmethod
     async def processing():
         while True:
             for u in User._.values():
-                await u.ws.send('ping')
+                await u.send('ping')
             await asyncio.sleep(15)
-
-    @staticmethod
-    async def send_id(id_, msg):
-        await User._[id_].ws.send(msg)
 
     @staticmethod
     async def get(id_, ws=None):
@@ -81,40 +103,38 @@ class User:
         for u in User._.values():
             if u.game or not u.name or u.name == 'User':
                 continue
-            ans += u.name + ' \n'
-        ans += 'Bot \n'
+            ans += '-> ' + u.name + ' \n'
+        ans += '-> Bot \n'
         return ans
 
 
 async def processing(ws, path):
     async for message in ws:
-        j = json.loads(message)
-        print(json.dumps(j))
-        u = await User.get(j['id'], ws)
-        msg = j['message'].lower()
-        if not u.game:
-            ans = 'Who do you want to play with? Type their name\n' + await User.names_str()
-            if not u.name or u.name == 'User':
-                if await u.register(msg):
-                    msg += '1'
-                    ans += u.name
-                else:
-                    ans = 'What is your name?'
-            elif await u.connect(msg):
-                ans = f'Successfully connected. Insert \'exit\' if you want leave the game.\n' \
-                          f'Now make your first move (send a number from 1 to 9):'
-        elif msg == 'exit':
-            opponent = u.players[0] if u.players[0] != u else u.players[1]
-            ans = 'You has escaped the game...'
-            u.game = opponent.game = None
-            u.players = opponent.players = None, None
-            if opponent and opponent != u:
-                await opponent.ws.send(u.name + ' has escaped the game...')
-                opponent.game = None
-                opponent.players = None, None
-        else:
-            ans = await u.answer(msg)
-        await u.ws.send(ans)
+        try:
+            j = json.loads(message)
+            u = await User.get(j['id'], ws)
+            msg = j['message'].lower()
+            if not u.game:
+                ans = 'Who do you want to play with? Type their name or wait till someone invites you.\n' \
+                      + await User.names_str()
+                if not u.name or u.name == 'User':
+                    if await u.register(msg):
+                        msg += '1'
+                        ans += '-> ' + u.name + '\n'
+                    else:
+                        ans = 'What is your name? Text only.'
+                elif await u.connect(msg):
+                    ans = f'Successfully connected. Insert \'exit\' if you want leave the game.\n' \
+                              f'Now make your first move (send a number from 1 to 9):'
+            elif msg == 'exit':
+                ans = await u.disconnect()
+            else:
+                ans = await u.answer(msg)
+            await u.send(ans)
+        except json.decoder.JSONDecodeError:
+            await ws.send('Error: Message should contain json objects!')
+        except KeyError:
+            await ws.send('Error: PLease, be aware to include \'id\' and \'message\' keys in your message!')
 
 
 if __name__ == '__main__':

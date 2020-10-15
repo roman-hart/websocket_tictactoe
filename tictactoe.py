@@ -3,7 +3,7 @@ import time
 X_SIGN = "X"
 O_SIGN = "O"
 EMPTY_SIGN = "-"
-important = [4, 0, 2, 6, 8]
+important = [0, 1, 4, 0, 2, 6, 8]  # for smart bot moves - change to give user a chance
 
 
 class Game:
@@ -13,18 +13,17 @@ class Game:
         self.sets = [(X_SIGN, O_SIGN), (O_SIGN, X_SIGN)]  # sign and opponent_sign for each player
 
     async def move(self, n):
-        num = self.step % 2
-        sign, opponent_sign = self.sets[num]
+        sign, opponent_sign = self.sets[self.step % 2]
         self.m[n] = sign
         self.step += 1
         ans = f'{sign}: {n + 1} \n{self.board(self.m)}'
         if self.step > 3:
-            if self.step == 8:
+            if self.step > 7:
                 self.m[self.m.index(EMPTY_SIGN)] = sign
                 self.step += 1
             win = self._check_win(sign)
             if win or self.step > 8:
-                self.step = 0
+                self.step = 0 # not self.step % 2
                 self.m = [EMPTY_SIGN for i in range(9)]
                 ans += f'\"{sign}\" won!\n' if win else 'We have a draw!\n'
         return ans
@@ -82,7 +81,7 @@ class Game:
             r = b - a
             v = []
             if a == 4 or b == 4 or r == 1 and a % 3 == 0 or r == 3:
-                if b > 5:
+                if b > 4:
                     v = [a - r]
                 else:
                     v = [b + r]
@@ -99,18 +98,5 @@ class Game:
     @staticmethod
     def get_num():
         return int(time.time()*1000000) % 10  # almost random :)
-
-
-async def main():
-    g = Game()
-    while True:
-        num = g.step % 2
-        if num == 0:
-            n = g.smart_move(g.m, *g.sets[num])
-        else:
-            n = int(input()) - 1
-        print(await g.move(n))
-
-# asyncio.get_event_loop().run_until_complete(main())
 
 
