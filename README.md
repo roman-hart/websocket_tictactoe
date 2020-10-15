@@ -1,5 +1,5 @@
 <h1 align="center">Tic-tac-toe on websockets</h1>
-<p align="center"><i>Multi-user console game built on asynchronous websockets module. Includes opportunity to play with a bot or with yourself.</i></p>
+<p align="center"><i>Multi-user console game built on asynchronous websockets module. Includes opportunity to play with a bot / with yourself.</i></p>
 <p align="center"><i>Developed as a laboratory project for <a href="http://www.univ.kiev.ua/en">Taras Shevchenko National University of Kyiv</a></i></p>
 <br>
 
