@@ -34,9 +34,6 @@ class User:
             self.game = opponent.game = Game()
             self.players = opponent.players = self, opponent
             return True
-            # except Exception as e:
-            #    await self.send(f'ERROR: {e} \nWe have lost connection with this user.')
-             #   User._.pop(opponent.id)
 
     async def answer(self, msg):
         n = self.game.step % 2
@@ -66,9 +63,9 @@ class User:
             try:
                 await self.ws.send(msg)
             except:
-                await User._disconnect(self)
                 try:
                     opponent = self.players[int(not self.players.index(self))]
+                    await User._disconnect(self)
                     if opponent:
                         await User._disconnect(opponent)
                         await opponent.ws.send(f'We\'ve lost connection with {self.name}...')
