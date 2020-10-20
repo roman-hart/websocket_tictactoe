@@ -3,14 +3,16 @@ import time
 X_SIGN = "X"
 O_SIGN = "O"
 EMPTY_SIGN = "-"
-important = [0, 1, 4, 0, 2, 6, 8]  # for smart bot moves - change to give user a chance
+important = [4, 0, 2, 6, 8]  # for smart bot moves - change to give user a chance
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, difficulty=2):
+        self.difficulty = difficulty  # [0, 9] chances to skip random move for game with a bot
         self.m = [EMPTY_SIGN for i in range(9)]  # tic-tac-toe matrix
         self.step = 0
         self.sets = [(X_SIGN, O_SIGN), (O_SIGN, X_SIGN)]  # sign and opponent_sign for each player
+        self.changed = False  #
 
     async def move(self, n):
         sign, opponent_sign = self.sets[self.step % 2]
@@ -18,12 +20,9 @@ class Game:
         self.step += 1
         ans = f'{sign}: {n + 1} \n{self.board(self.m)}'
         if self.step > 3:
-            if self.step > 7:
-                self.m[self.m.index(EMPTY_SIGN)] = sign
-                self.step += 1
             win = self._check_win(sign)
-            if win or self.step > 8:
-                self.step = 0 # not self.step % 2
+            if win or EMPTY_SIGN not in self.m:
+                self.step = self.step % 2
                 self.m = [EMPTY_SIGN for i in range(9)]
                 ans += f'\"{sign}\" won!\n' if win else 'We have a draw!\n'
         return ans
@@ -54,19 +53,24 @@ class Game:
         return ans + "\n"
 
     def smart_move(self, m, sign, opponent_sign):
+        if self.get_num() > self.difficulty:
+            return self._rand_move(m)
         win_move = self._smart_move(m, sign)
         if win_move:
             return win_move-1
         block_move = self._smart_move(m, opponent_sign)
         if block_move:
             return block_move-1
-        return self._important_places_move(m)
+        return self._rand_move(m, important_places=True)
 
-    def _important_places_move(self, m):
-        if m[4] == EMPTY_SIGN:
-            return 4
+    def _rand_move(self, m, important_places=False):
+        places = range(9)
+        if important_places:
+            if m[4] == EMPTY_SIGN:
+                return 4
+            places = important[1:]
         empty = []
-        for i in important[1:]:
+        for i in places:
             if m[i] == EMPTY_SIGN:
                 empty.append(i)
         return empty[self.get_num() % len(empty)] if empty else m.index(EMPTY_SIGN)

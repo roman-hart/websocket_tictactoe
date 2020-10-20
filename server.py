@@ -18,6 +18,7 @@ class User:
     async def register(self, msg):
         if msg and msg.isalpha():
             self.name = msg.capitalize()
+            await User.send_all(f"We have a new player {self.name}!", pass_with_game=True, user_to_pass=self)
             return True
 
     async def connect(self, msg):
@@ -36,6 +37,25 @@ class User:
             return True
 
     async def answer(self, msg):
+        if not self.game:
+            ans = 'Who do you want to play with? Type their name or wait till someone invites you.\n' \
+                  + await User.names_str()
+            if not self.name or self.name == 'User':
+                if await self.register(msg):
+                    msg += '1'
+                    ans += '-> ' + self.name + '\n'
+                else:
+                    ans = 'What is your name? Text only.'
+            elif await self.connect(msg):
+                ans = f'Successfully connected. Insert \'exit\' if you want leave the game.\n' \
+                      f'Now make your first move (send a number from 1 to 9):'
+        elif msg == 'exit':
+            ans = await self.disconnect()
+        else:
+            ans = await self.game_answer(msg)
+        return ans
+
+    async def game_answer(self, msg):
         n = self.game.step % 2
         if self.players[n] != self:
             return 'Now we are waiting for your opponent to move!'
@@ -48,7 +68,7 @@ class User:
             await waiting_player.send(message + 'Your move:' if self.game.step % 2 != n else message)
         else:
             message += await self.game.move(self.game.smart_move(self.game.m, *self.game.sets[not n])) + '\nYour move: '
-        return message + 'Your move:' if self.game.step % 2 == n else message
+        return message + 'Your move:' if waiting_player and self.game.step % 2 == n else message
 
     async def disconnect(self):
         opponent = self.players[int(not self.players.index(self))]
@@ -81,9 +101,15 @@ class User:
     @staticmethod
     async def processing():
         while True:
-            for u in User._.values():
-                await u.send('ping')
+            await User.send_all('ping')
             await asyncio.sleep(15)
+
+    @staticmethod
+    async def send_all(msg, pass_with_game=False, user_to_pass=None):
+        for u in User._.values():
+            if pass_with_game and u.game or user_to_pass and user_to_pass == u:
+                continue
+            await u.send(msg)
 
     @staticmethod
     async def get(id_, ws=None):
@@ -111,23 +137,7 @@ async def processing(ws, path):
             j = json.loads(message)
             u = await User.get(j['id'], ws)
             msg = j['message'].lower()
-            if not u.game:
-                ans = 'Who do you want to play with? Type their name or wait till someone invites you.\n' \
-                      + await User.names_str()
-                if not u.name or u.name == 'User':
-                    if await u.register(msg):
-                        msg += '1'
-                        ans += '-> ' + u.name + '\n'
-                    else:
-                        ans = 'What is your name? Text only.'
-                elif await u.connect(msg):
-                    ans = f'Successfully connected. Insert \'exit\' if you want leave the game.\n' \
-                              f'Now make your first move (send a number from 1 to 9):'
-            elif msg == 'exit':
-                ans = await u.disconnect()
-            else:
-                ans = await u.answer(msg)
-            await u.send(ans)
+            await u.send(await u.answer(msg))
         except json.decoder.JSONDecodeError:
             await ws.send('Error: Message should contain json objects!')
         except KeyError:
