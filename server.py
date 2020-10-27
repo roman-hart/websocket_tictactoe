@@ -65,10 +65,10 @@ class User:
             return er
         message = await self.game.move(int(msg)-1)
         if waiting_player:
-            await waiting_player.send(message + 'Your move:' if self.game.step % 2 != n else message)
+            await waiting_player.send(message + 'Your move:' if self.game and self.game.step % 2 != n else message)
         else:
             message += await self.game.move(self.game.smart_move(self.game.m, *self.game.sets[not n])) + '\nYour move: '
-        return message + 'Your move:' if waiting_player and self.game.step % 2 == n else message
+        return message + 'Your move:' if waiting_player and self.game and self.game.step % 2 == n else message
 
     async def disconnect(self):
         opponent = self.players[int(not self.players.index(self))]
@@ -106,10 +106,13 @@ class User:
 
     @staticmethod
     async def send_all(msg, pass_with_game=False, user_to_pass=None):
-        for u in User._.values():
-            if pass_with_game and u.game or user_to_pass and user_to_pass == u:
-                continue
-            await u.send(msg)
+        try:
+            for u in User._.values():
+                if pass_with_game and u.game or user_to_pass and user_to_pass == u:
+                    continue
+                await u.send(msg)
+        except:
+            pass
 
     @staticmethod
     async def get(id_, ws=None):
@@ -132,16 +135,18 @@ class User:
 
 
 async def processing(ws, path):
-    async for message in ws:
-        try:
+    try:
+        async for message in ws:
             j = json.loads(message)
             u = await User.get(j['id'], ws)
             msg = j['message'].lower()
             await u.send(await u.answer(msg))
-        except json.decoder.JSONDecodeError:
-            await ws.send('Error: Message should contain json objects!')
-        except KeyError:
-            await ws.send('Error: PLease, be aware to include \'id\' and \'message\' keys in your message!')
+    except json.decoder.JSONDecodeError:
+        await ws.send('Error: Message should contain json objects!')
+    except KeyError:
+        await ws.send('Error: PLease, be aware to include \'id\' and \'message\' keys in your message!')
+    except Exception as e:
+        print(f"Exception: {e}")
 
 
 if __name__ == '__main__':
